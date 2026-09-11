@@ -1,27 +1,24 @@
 # Task API
 
-A lightweight CRUD API for managing a to-do list, built with Python and FastAPI. This project was built as part of FlyRank AI's Backend Engineering internship (Week 2, Assignment 1), and covers the full create-read-update-delete cycle with proper validation and status codes.It was later extended in Week 3 to use a real SQLite database instead of in-memory storage.
+A lightweight CRUD API for managing a to-do list, built with Python and FastAPI. This project was built as part of FlyRank AI's Backend Engineering internship (Week 2, Assignment 1), and covers the full create-read-update-delete cycle with proper validation and status codes.It was later extended in Week 3 to use a real SQLite database instead of in-memory storage, and further containerized with Docker and Postgres.
 
 ## Features
 
-- Full CRUD operations on tasks, stored in a SQLite database
+- Full CRUD operations on tasks, stored in a Postgres database, fully containerized with Docker
 - Input validation with clear error responses
 - Interactive API documentation via Swagger UI
 - Tested through both curl and Swagger UI
 
 ## Getting Started
 
-Requirements: Python 3.10+
+Requirements: Docker Desktop
 
-1. Install dependencies:
+1. Copy `.env.example` to `.env` (already configured with default local values)
+2. Start the whole stack:
 
-   pip install fastapi uvicorn
+   docker compose up --build
 
-2. Run the server:
-
-   uvicorn main:app --reload
-
-3. The API will be available at http://localhost:80004. On first run, a `tasks.db` file is created automatically, with 3 example tasks
+3. The API will be available at http://localhost:8000
 
 ## Endpoints
 
@@ -50,9 +47,9 @@ FastAPI automatically generates interactive documentation at /docs, where every 
 
 ![Swagger UI](swagger-screenshot.png)
 
-## Database
+## Database (SQLite era)
 
-This project uses SQLite instead of an in-memory list, so task data survives server restarts.
+This project originally used SQLite instead of an in-memory list, so task data survived server restarts. It was later migrated to Postgres, running in Docker (see the "Docker & Persistence" section below).
 
 **Why SQLite:** It requires no separate database server or installation, just a single file, making it ideal for a small project like this while still using real SQL, and it comes built into Python's standard library.
 
@@ -64,9 +61,22 @@ This project uses SQLite instead of an in-memory list, so task data survives ser
 
 ![Database Viewer](database-screenshot.png)
 
-## Data Persistence
+## Docker & Persistence
 
-Unlike the earlier in-memory version of this project, task data now survives server restarts, since it is stored in `tasks.db` rather than a Python list. Restarting the server no longer clears existing tasks; the 3 example tasks are only inserted on the very first run, when the table is empty.
+This project is fully containerized: the FastAPI app and a Postgres database both run in Docker, started together with a single command.
+
+**Why Docker + Postgres:** Running Postgres in a container avoids needing to install it directly on the host machine, and Docker Compose lets the app and database start together as one coordinated stack.
+
+**How to run the whole stack:**
+
+    docker compose up --build
+
+The app becomes available at http://localhost:8000, and Postgres runs alongside it automatically. Configuration (the database connection string) is read from a `.env` file (see `.env.example` for the required format), which is gitignored and never committed.
+
+**Architecture unchanged:** Only the storage layer changed, swapping SQLite for Postgres only required updating `get_connection()`, `init_db()`, and the query syntax inside each endpoint (SQLite's `?` placeholders became Postgres's `%s`, and `cursor.lastrowid` became `RETURNING id`). Every endpoint, URL, and response shape stayed exactly the same, proving the API and the data layer are genuinely separate concerns.
+
+**Persistence proven:** I created a task via POST, then ran `docker compose down` (removing both containers entirely) followed by `docker compose up --build` (rebuilding and recreating fresh containers). The task I created was still present in `GET /tasks` afterward, confirming data survives both an app restart and a full container restart, thanks to the named Docker volume (`postgres_data`) that stores Postgres's actual data files outside the container itself.
+
 
 ## What I Learned
 
